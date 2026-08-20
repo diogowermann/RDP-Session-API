@@ -96,3 +96,43 @@ class SnapshotResult(BaseModel):
     created: int
     updated: int
     closed: int
+
+
+class ServerItem(BaseModel):
+    id: str
+    hostname: str | None
+    fqdn: str | None
+    os_version: str | None
+    agent_version: str | None
+    enabled: bool
+    last_seen_at: datetime | None
+    last_snapshot_at: datetime | None
+    last_boot_at: datetime | None
+
+
+class ServerSummary(BaseModel):
+    server: ServerItem
+    active_users: int
+    active_sessions: int
+    disconnected_sessions: int
+    open_sessions: int
+
+
+class SessionItem(BaseModel):
+    id: str
+    server_id: str
+    windows_session_id: int
+    username: str
+    domain: str | None
+    state: str
+    logon_at: datetime | None
+    logoff_at: datetime | None
+    duration_minutes: int | None
+    disconnect_count: int
+    end_reason: str | None
+
+
+class SessionPage(BaseModel):
+    items: list[SessionItem]
+    limit: int
+    offset: int
