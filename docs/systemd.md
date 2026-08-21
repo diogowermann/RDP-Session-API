@@ -30,7 +30,7 @@ RDP_SESSION_QUERY_API_KEY=<long-random-query-key>
 Then install the unit. If an existing validated `.env` is being migrated, pass it explicitly as the source:
 
 ```bash
-sudo ./scripts/install_systemd.sh \
+sudo bash ./scripts/install_systemd.sh \
   --app-dir /opt/rdp-session-api \
   --env-source /path/to/existing.env \
   --start
