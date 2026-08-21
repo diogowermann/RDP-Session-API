@@ -12,6 +12,8 @@ Group=@SERVICE_USER@
 WorkingDirectory=@APP_DIR@
 EnvironmentFile=/etc/rdp-session-api/rdp-session-api.env
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=@APP_DIR@/.venv/bin/alembic -c @APP_DIR@/alembic.ini upgrade head
 ExecStart=@APP_DIR@/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8091 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5s
