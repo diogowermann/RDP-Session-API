@@ -15,6 +15,7 @@ The project is infrastructure-agnostic. It does not contain environment-specific
 - Read/query endpoints protected by a separate API key.
 - SQLAlchemy models and Alembic migrations.
 - MariaDB production support with SQLite-compatible tests.
+- Production systemd deployment with a dedicated service account, protected environment file, automatic restart, migration preflight and journald logging.
 
 The Windows-side collector is maintained separately in the `RDP-Session-Agent` project.
 
@@ -38,14 +39,16 @@ Operational:
 
 ## Installation
 
-See [docs/installation.md](docs/installation.md) for the generic installation and configuration workflow.
+See [docs/installation.md](docs/installation.md) for application setup and [docs/systemd.md](docs/systemd.md) for the production systemd runbook.
 
 ## Security model
 
 Agent credentials are unique per registered server. The API stores only a hash of each Agent secret. Read/query endpoints use a separate `X-API-Key`, so exposing the Agent ingestion path does not implicitly expose session history.
 
+Production deployment keeps Uvicorn on loopback, runs under a non-login operating-system account and reads secrets from a root-protected environment file outside the repository checkout.
+
 Do not commit `.env` files, real credentials, internal hostnames, private network addresses, or production reverse-proxy configuration.
 
 ## Status
 
-The project is in early development. The current installation guide is suitable for development and manual validation; production systemd/install automation will be added after the API and Agent contracts stabilize.
+The core event-ingestion, query and snapshot-reconciliation contracts are implemented. The repository includes a systemd deployment path for controlled Linux operation while Windows Server compatibility validation continues in the Agent project.
