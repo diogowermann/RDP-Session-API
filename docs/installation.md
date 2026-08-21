@@ -28,7 +28,7 @@ python3 -m venv .venv
 
 Create an empty database and a dedicated SQL user. Grant that user only the permissions required by this database. Do not reuse credentials from unrelated applications.
 
-Copy `.env.example` to `.env` only for a local/manual deployment. In managed production deployments, prefer a protected environment file outside the repository checkout.
+Copy `.env.example` to `.env` only for a local/manual deployment. In managed production deployments, use `/etc/rdp-session-api/rdp-session-api.env` through the provided systemd workflow.
 
 Required settings:
 
@@ -39,13 +39,15 @@ RDP_SESSION_QUERY_API_KEY=<long-random-query-key>
 
 `RDP_SESSION_QUERY_API_KEY` protects read/query endpoints. It is separate from per-server Agent credentials.
 
-## 3. Apply migrations
+## 3. Apply migrations for manual validation
 
-Run all Alembic migrations before starting a new application version:
+For a manual/local run, apply Alembic migrations directly:
 
 ```bash
 .venv/bin/alembic upgrade head
 ```
+
+The production systemd unit runs the same migration as `ExecStartPre` using the protected production environment file.
 
 ## 4. Register the first Windows server
 
@@ -65,7 +67,7 @@ To rotate a server credential:
 
 Rotation immediately revokes previous active credentials for that server.
 
-## 5. Validate the API
+## 5. Validate the API manually
 
 For a local validation run:
 
@@ -81,18 +83,40 @@ GET /api/v1/health
 
 The health endpoint is intentionally simple. Query endpoints require `X-API-Key`; Agent ingestion requires `X-Server-ID` plus a Bearer token.
 
-## 6. Production deployment
+## 6. Production deployment with systemd
 
-Run the application behind HTTPS and bind the application process to loopback or another private application interface. Do not expose the Uvicorn development command directly to untrusted networks.
+After manual validation, stop the manually launched Uvicorn process before systemd takes ownership of port `8091`.
 
-A production deployment should also provide:
+The repository provides:
 
-- a dedicated operating-system user;
-- a protected environment file;
-- a process supervisor such as systemd;
-- database backups;
-- log retention;
-- TLS termination at the reverse proxy;
-- controlled upgrade and rollback procedures.
+- `deploy/rdp-session-api.service.in` - hardened systemd unit template;
+- `scripts/install_systemd.sh` - idempotent installer/renderer;
+- `docs/systemd.md` - production operation and upgrade runbook.
 
-Project-provided systemd/install automation is intentionally deferred until the runtime contract is stable. Until then, treat the commands above as a manual validation workflow rather than a complete production runbook.
+Example for a prepared checkout:
+
+```bash
+sudo bash ./scripts/install_systemd.sh \
+  --app-dir /opt/rdp-session-api \
+  --env-source /path/to/validated.env \
+  --start
+```
+
+The resulting service:
+
+- runs as the dedicated `rdp-session-api` system user;
+- reads secrets from `/etc/rdp-session-api/rdp-session-api.env`;
+- binds Uvicorn only to `127.0.0.1:8091`;
+- runs pending Alembic migrations before Uvicorn starts;
+- restarts automatically after process failure;
+- sends stdout/stderr to journald;
+- starts automatically at boot;
+- applies systemd hardening without requiring privileged Linux capabilities.
+
+For existing installations in a different checkout directory, pass that current path to `--app-dir`; moving the repository is not required.
+
+See [systemd.md](systemd.md) for status, logs, upgrades and conversion from a manual Uvicorn deployment.
+
+## 7. Reverse proxy
+
+Production Agent traffic should terminate HTTPS at a reverse proxy and forward to the loopback Uvicorn listener. Keep certificates, internal DNS names and environment-specific Nginx configuration outside this public repository.

@@ -1,0 +1,44 @@
+[Unit]
+Description=RDP Session API
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=/etc/rdp-session-api/rdp-session-api.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=@APP_DIR@/.venv/bin/alembic -c @APP_DIR@/alembic.ini upgrade head
+ExecStart=@APP_DIR@/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8091 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0027
+
+# Service hardening. The API requires no privileged capabilities or writable
+# system paths at runtime.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Keep application output in the system journal rather than unmanaged files.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rdp-session-api
+
+[Install]
+WantedBy=multi-user.target
