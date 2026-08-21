@@ -13,6 +13,16 @@ def to_utc_naive(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def normalize_boot_time(value: datetime) -> datetime:
+    """Normalize boot timestamps to UTC-naive whole-second precision.
+
+    Windows may report sub-second boot timestamps while common MariaDB DATETIME
+    columns persist only whole seconds. Treating those values as exact datetimes
+    can therefore create false reboot detections across Agent batches.
+    """
+    return to_utc_naive(value).replace(microsecond=0)
+
+
 def as_utc(value: datetime | None) -> datetime | None:
     """Expose a stored naive UTC datetime as an aware UTC datetime."""
     if value is None:
