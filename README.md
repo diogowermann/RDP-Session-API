@@ -1,54 +1,121 @@
 # RDP Session API
 
-RDP Session API is a small REST service for receiving Windows Remote Desktop session telemetry and maintaining a consolidated session history.
+RDP Session API is the central REST service of a lightweight Remote Desktop Services monitoring stack. It receives lifecycle events and current-state snapshots from Windows servers, consolidates RDP session state, stores history, and exposes read endpoints for dashboards and integrations such as Grafana.
 
-The project is infrastructure-agnostic. It does not contain environment-specific hostnames, credentials, network addresses, or deployment configuration.
+The project is intentionally infrastructure-agnostic. This repository does **not** contain environment-specific hostnames, credentials, private addresses, TLS material, or production reverse-proxy configuration.
 
-## Current scope
+The Windows collector is maintained separately in [RDP-Session-Agent](https://github.com/diogowermann/RDP-Session-Agent).
+
+## Current capabilities
 
 - Versioned `/api/v1` contract.
-- Per-server Agent authentication.
+- Per-server Agent authentication with individually registered credentials.
 - Administrative server registration and credential rotation.
-- Idempotent RDP event ingestion.
-- Session state consolidation (`ACTIVE`, `DISCONNECTED`, `CLOSED`).
-- Snapshot reconciliation for current session state.
-- Read/query endpoints protected by a separate API key.
-- SQLAlchemy models and Alembic migrations.
-- MariaDB production support with SQLite-compatible tests.
-- Production systemd deployment with a dedicated service account, protected environment file, automatic restart, migration preflight and journald logging.
+- Idempotent Event Log ingestion.
+- Consolidated session states: `ACTIVE`, `DISCONNECTED`, and `CLOSED`.
+- WTS snapshot reconciliation for current-state correction.
+- Separate `X-API-Key` protection for read/query endpoints.
+- SQLAlchemy persistence with Alembic migrations.
+- MariaDB / MySQL production support and SQLite-compatible tests.
+- Managed Linux deployment through systemd.
+- Loopback-only Uvicorn deployment behind an HTTPS reverse proxy.
+- JSON endpoints suitable for Grafana or other internal consumers.
 
-The Windows-side collector is maintained separately in the `RDP-Session-Agent` project.
+## System context
+
+```mermaid
+flowchart LR
+    subgraph Windows[Monitored Windows Servers]
+        A1["RDP Session Agent"]
+        A2["RDP Session Agent"]
+        AN["RDP Session Agent"]
+    end
+
+    subgraph ApiHost[Linux API Host]
+        Proxy["HTTPS Reverse Proxy"]
+        API["RDP Session API"]
+        DB[("MariaDB / MySQL")]
+    end
+
+    Grafana["Grafana / API consumers"]
+
+    A1 -->|events + WTS snapshots| Proxy
+    A2 -->|events + WTS snapshots| Proxy
+    AN -->|events + WTS snapshots| Proxy
+    Grafana -->|X-API-Key + HTTPS| Proxy
+    Proxy --> API
+    API --> DB
+```
 
 ## API surface
 
-Agent ingestion:
+### Agent ingestion
 
 - `POST /api/v1/agent/events`
 - `POST /api/v1/agent/snapshot`
 
-Read/query API:
+Agent ingestion requires:
+
+```http
+X-Server-ID: <server-id>
+Authorization: Bearer <agent-secret>
+```
+
+### Read/query API
 
 - `GET /api/v1/servers`
 - `GET /api/v1/servers/{server_id}/summary`
 - `GET /api/v1/servers/{server_id}/sessions/active`
 - `GET /api/v1/servers/{server_id}/sessions/history`
 
-Operational:
+Read/query endpoints require:
+
+```http
+X-API-Key: <query-api-key>
+```
+
+### Operational
 
 - `GET /api/v1/health`
 
-## Installation
+## Documentation
 
-See [docs/installation.md](docs/installation.md) for application setup and [docs/systemd.md](docs/systemd.md) for the production systemd runbook.
+- [Documentation index](docs/README.md)
+- [Installation and configuration](docs/installation.md)
+- [System architecture](docs/system-architecture.md)
+- [systemd deployment and operations](docs/systemd.md)
+
+## Typical onboarding flow
+
+1. Install and configure the central API.
+2. Register each Windows server with `scripts/register_server.py`.
+3. Store the returned one-time Agent secret securely.
+4. Install RDP Session Agent on that Windows server using its unique `server_id` and secret.
+5. Validate the server summary and current sessions through the query API.
+6. Repeat registration and Agent installation for each additional server.
 
 ## Security model
 
-Agent credentials are unique per registered server. The API stores only a hash of each Agent secret. Read/query endpoints use a separate `X-API-Key`, so exposing the Agent ingestion path does not implicitly expose session history.
+- Every Windows server receives a unique Agent credential.
+- The API stores only a hash of each Agent secret.
+- Agent credentials cannot query session history.
+- Read access uses a separate query API key.
+- Production deployment keeps Uvicorn on loopback and exposes only the reverse proxy.
+- Runtime secrets belong in a protected environment file outside the Git checkout.
 
-Production deployment keeps Uvicorn on loopback, runs under a non-login operating-system account and reads secrets from a root-protected environment file outside the repository checkout.
+## Public repository safety
 
-Do not commit `.env` files, real credentials, internal hostnames, private network addresses, or production reverse-proxy configuration.
+Never commit:
 
-## Status
+- production `.env` files;
+- real API keys or Agent secrets;
+- private DNS names or addresses;
+- TLS private keys or certificates;
+- database passwords;
+- environment-specific reverse-proxy configuration.
 
-The core event-ingestion, query and snapshot-reconciliation contracts are implemented. The repository includes a systemd deployment path for controlled Linux operation while Windows Server compatibility validation continues in the Agent project.
+All documentation examples use fictitious values intentionally.
+
+## License
+
+Released under the [MIT License](LICENSE).
