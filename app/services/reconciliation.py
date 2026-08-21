@@ -4,11 +4,12 @@ from sqlalchemy.orm import Session
 from app.models import RdpSession, Server
 from app.schemas import AgentSnapshot, SnapshotResult
 from app.services.session_state import OPEN_STATES, close_previous_boot_sessions, find_open_session
-from app.timeutils import duration_minutes, to_utc_naive, utc_now
+from app.timeutils import duration_minutes, normalize_boot_time, to_utc_naive, utc_now
 
 
 def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) -> SnapshotResult:
-    closed = close_previous_boot_sessions(db, server, snapshot.boot_time_utc)
+    boot_time = normalize_boot_time(snapshot.boot_time_utc)
+    closed = close_previous_boot_sessions(db, server, boot_time)
 
     server.hostname = snapshot.hostname or server.hostname
     server.fqdn = snapshot.fqdn or server.fqdn
@@ -25,7 +26,7 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
         session = find_open_session(
             db,
             server_id=server.id,
-            boot_time=snapshot.boot_time_utc,
+            boot_time=boot_time,
             windows_session_id=observed.session_id,
             username=observed.username,
             domain=observed.domain,
@@ -36,7 +37,7 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
                 windows_session_id=observed.session_id,
                 username=observed.username,
                 domain=observed.domain,
-                boot_time=to_utc_naive(snapshot.boot_time_utc),
+                boot_time=boot_time,
                 state=observed.state.value,
                 logon_at=to_utc_naive(observed.logon_at) if observed.logon_at else None,
                 last_connected_at=to_utc_naive(observed.logon_at) if observed.logon_at and observed.state.value == "ACTIVE" else None,
@@ -59,7 +60,7 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
     open_sessions = db.scalars(
         select(RdpSession).where(
             RdpSession.server_id == server.id,
-            RdpSession.boot_time == to_utc_naive(snapshot.boot_time_utc),
+            RdpSession.boot_time == boot_time,
             RdpSession.state.in_(OPEN_STATES),
         )
     ).all()
