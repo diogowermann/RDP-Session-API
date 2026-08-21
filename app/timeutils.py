@@ -13,6 +13,15 @@ def to_utc_naive(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def as_utc(value: datetime | None) -> datetime | None:
+    """Expose a stored naive UTC datetime as an aware UTC datetime."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def duration_minutes(start: datetime, end: datetime) -> int:
     start_utc = to_utc_naive(start)
     end_utc = to_utc_naive(end)

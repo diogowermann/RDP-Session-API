@@ -2,6 +2,7 @@ import os
 from collections.abc import Generator
 
 os.environ["RDP_SESSION_DATABASE_URL"] = "sqlite:///./test-rdp-session.db"
+os.environ["RDP_SESSION_QUERY_API_KEY"] = "test-query-key"
 
 import pytest
 from fastapi.testclient import TestClient
