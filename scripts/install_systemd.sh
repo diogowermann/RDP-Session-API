@@ -18,17 +18,26 @@ Options:
   --help               Show this help
 
 The installer never overwrites an existing production environment file unless
---env-source is explicitly supplied.
+--env-source is explicitly supplied. Alembic migrations run as ExecStartPre
+using the same protected environment as the API service.
 EOF
 }
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --app-dir)
+            if [ "$#" -lt 2 ]; then
+                echo "--app-dir requires a path." >&2
+                exit 2
+            fi
             APP_DIR="$2"
             shift 2
             ;;
         --env-source)
+            if [ "$#" -lt 2 ]; then
+                echo "--env-source requires a path." >&2
+                exit 2
+            fi
             ENV_SOURCE="$2"
             shift 2
             ;;
@@ -118,11 +127,10 @@ echo "Application directory: $APP_DIR"
 echo "Environment file: $ENV_TARGET"
 
 if [ "$START_SERVICE" -eq 1 ]; then
-    "$ALEMBIC_BIN" -c "$APP_DIR/alembic.ini" upgrade head
     systemctl restart "$SERVICE_NAME.service"
     systemctl --no-pager --full status "$SERVICE_NAME.service"
 else
     echo "Service enabled but not started."
-    echo "Before starting, run migrations and validate the environment file."
-    echo "Then use: systemctl start $SERVICE_NAME.service"
+    echo "Validate the protected environment file, then use:"
+    echo "  systemctl start $SERVICE_NAME.service"
 fi
