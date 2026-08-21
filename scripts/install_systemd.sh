@@ -9,7 +9,7 @@ START_SERVICE=0
 
 usage() {
     cat <<'EOF'
-Usage: sudo ./scripts/install_systemd.sh [options]
+Usage: sudo bash ./scripts/install_systemd.sh [options]
 
 Options:
   --app-dir PATH       Application checkout path (default: /opt/rdp-session-api)
