@@ -15,6 +15,7 @@ The Windows collector is maintained separately in [RDP-Session-Agent](https://gi
 - Consolidated session states: `ACTIVE`, `DISCONNECTED`, and `CLOSED`.
 - WTS snapshot reconciliation for current-state correction.
 - Separate `X-API-Key` protection for read/query endpoints.
+- Cross-server LOGON alert feed designed for Grafana multi-dimensional alerting.
 - SQLAlchemy persistence with Alembic migrations.
 - MariaDB / MySQL production support and SQLite-compatible tests.
 - Managed Linux deployment through systemd.
@@ -67,12 +68,15 @@ Authorization: Bearer <agent-secret>
 - `GET /api/v1/servers/{server_id}/summary`
 - `GET /api/v1/servers/{server_id}/sessions/active`
 - `GET /api/v1/servers/{server_id}/sessions/history`
+- `GET /api/v1/alerts/logons?lookback_minutes=5`
 
 Read/query endpoints require:
 
 ```http
 X-API-Key: <query-api-key>
 ```
+
+The LOGON alert feed returns one row per recently received, idempotently accepted LOGON event across all enabled servers. It is intended for Grafana alert rules that use `alert_id` as a unique instance label and `alert_value` as the numeric condition field.
 
 ### Operational
 
@@ -83,6 +87,7 @@ X-API-Key: <query-api-key>
 - [Documentation index](docs/README.md)
 - [Installation and configuration](docs/installation.md)
 - [System architecture](docs/system-architecture.md)
+- [Grafana logon alerting](docs/grafana-alerting.md)
 - [systemd deployment and operations](docs/systemd.md)
 
 ## Typical onboarding flow
