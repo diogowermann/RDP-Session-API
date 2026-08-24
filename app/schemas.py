@@ -136,3 +136,14 @@ class SessionPage(BaseModel):
     items: list[SessionItem]
     limit: int
     offset: int
+
+
+class LogonAlertItem(BaseModel):
+    alert_id: str
+    server_id: str
+    hostname: str
+    principal: str
+    username: str
+    domain: str | None
+    logon_at: datetime
+    alert_value: int = Field(default=1, ge=1, le=1)
