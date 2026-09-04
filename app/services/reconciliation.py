@@ -34,6 +34,7 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
         if session is None:
             session = RdpSession(
                 server_id=server.id,
+                protocol="RDP",
                 windows_session_id=observed.session_id,
                 username=observed.username,
                 domain=observed.domain,

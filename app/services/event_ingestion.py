@@ -42,6 +42,7 @@ def ingest_events(db: Session, *, server: Server, envelope: AgentEnvelope) -> In
         db.add(
             SessionEvent(
                 server_id=server.id,
+                protocol="RDP",
                 event_type=event.type.value,
                 event_channel=event.channel,
                 event_id=event.event_id,

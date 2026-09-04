@@ -9,6 +9,7 @@ This directory contains the public technical documentation for RDP Session API.
 - [Grafana logon alerting](grafana-alerting.md) — cross-server LOGON event feed, Infinity query setup, multi-dimensional alert instances, no-data behavior and notification templates.
 - [systemd operations](systemd.md) — managed Linux runtime, service status, journald, upgrades and migration from manual Uvicorn execution.
 - [Phase 0 baseline capture](phase0-baseline.md) — pre-expansion operational evidence, backup/restore gate, version consistency and exit criteria.
+- [Phase 1 additive origin schema](phase1-additive-origin-schema.md) — additive storage for protocol, connection origin and future correlation jobs/evidence while preserving the Agent v1 contract.
 
 ## Companion project
 
