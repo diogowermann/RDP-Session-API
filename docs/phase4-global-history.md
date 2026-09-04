@@ -47,9 +47,12 @@ Event matching is based on:
 - server;
 - protocol;
 - provider session identifier;
-- boot identifier when present.
+- boot identifier when present;
+- the selected session's logon/logoff time window.
 
-This keeps RDP numeric session IDs and SSH identifiers such as `pts/2` in the same read model.
+The temporal boundary is required because providers may reuse identifiers such as an RDP session number or `pts/2` more than once during the same boot. Events from an earlier or later lifecycle are therefore excluded from the selected session timeline.
+
+This keeps RDP numeric session IDs and SSH identifiers such as `pts/2` in the same read model without treating those provider identifiers as globally unique identities.
 
 ## Compatibility
 
