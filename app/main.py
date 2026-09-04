@@ -8,7 +8,7 @@ from app.api.v2 import router as v2_router
 
 app = FastAPI(
     title="Remote Session API",
-    version="0.4.0",
+    version="0.5.0",
     description="Receives and queries normalized remote-session telemetry while preserving the legacy RDP v1 contract.",
 )
 
