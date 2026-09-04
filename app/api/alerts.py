@@ -22,18 +22,13 @@ def recent_logon_alerts(
     lookback_minutes: int = Query(default=5, ge=1, le=60),
     db: Session = Depends(get_db),
 ) -> list[LogonAlertItem]:
-    """Return recently received LOGON events as one alert instance per event.
-
-    The feed is intentionally based on immutable raw events instead of current
-    session state. A short-lived session can therefore still be observed by
-    Grafana after it has already logged off, while event idempotency prevents
-    duplicate alert instances when an Agent replays a spool batch.
-    """
+    """Return recently received RDP LOGON events for the legacy v1 feed."""
     cutoff = utc_now() - timedelta(minutes=lookback_minutes)
     rows = db.execute(
         select(SessionEvent, Server)
         .join(Server, Server.id == SessionEvent.server_id)
         .where(
+            SessionEvent.protocol == "RDP",
             SessionEvent.event_type == "LOGON",
             SessionEvent.received_at >= cutoff,
             Server.enabled.is_(True),

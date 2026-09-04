@@ -1,6 +1,6 @@
 # RDP Session API
 
-RDP Session API is the central REST service of a lightweight Remote Desktop Services monitoring stack. It receives lifecycle events and current-state snapshots from Windows servers, consolidates RDP session state, stores history, and exposes read endpoints for dashboards and integrations such as Grafana.
+RDP Session API is the central REST service of a lightweight remote-session monitoring stack. The production `/api/v1` surface remains focused on Windows RDP, while the additive `/api/v2` contract normalizes provider identity so the same domain can support RDP and SSH without forcing an immediate Windows Agent migration.
 
 The project is intentionally infrastructure-agnostic. This repository does **not** contain environment-specific hostnames, credentials, private addresses, TLS material, or production reverse-proxy configuration.
 
@@ -8,52 +8,47 @@ The Windows collector is maintained separately in [RDP-Session-Agent](https://gi
 
 ## Current capabilities
 
-- Versioned `/api/v1` contract.
+- Backward-compatible `/api/v1` Windows/RDP contract.
+- Generic `/api/v2` contract with `platform`, `protocol`, `boot_id`, `provider_session_id` and `provider_event_id`.
+- Internal normalization of v1 RDP payloads into the common session domain.
 - Per-server Agent authentication with individually registered credentials.
 - Administrative server registration and credential rotation.
-- Idempotent Event Log ingestion.
+- Idempotent event ingestion with v1 replay compatibility.
 - Consolidated session states: `ACTIVE`, `DISCONNECTED`, and `CLOSED`.
-- WTS snapshot reconciliation for current-state correction.
+- Snapshot reconciliation for current-state correction.
+- Optional IPv4/IPv6 connection origin.
 - Separate `X-API-Key` protection for read/query endpoints.
-- Cross-server LOGON alert feed designed for Grafana multi-dimensional alerting.
+- Cross-server LOGON alert feeds.
 - SQLAlchemy persistence with Alembic migrations.
 - MariaDB / MySQL production support and SQLite-compatible tests.
 - Managed Linux deployment through systemd.
 - Loopback-only Uvicorn deployment behind an HTTPS reverse proxy.
-- JSON endpoints suitable for Grafana or other internal consumers.
-
-## System context
-
-```mermaid
-flowchart LR
-    subgraph Windows[Monitored Windows Servers]
-        A1["RDP Session Agent"]
-        A2["RDP Session Agent"]
-        AN["RDP Session Agent"]
-    end
-
-    subgraph ApiHost[Linux API Host]
-        Proxy["HTTPS Reverse Proxy"]
-        API["RDP Session API"]
-        DB[("MariaDB / MySQL")]
-    end
-
-    Grafana["Grafana / API consumers"]
-
-    A1 -->|events + WTS snapshots| Proxy
-    A2 -->|events + WTS snapshots| Proxy
-    AN -->|events + WTS snapshots| Proxy
-    Grafana -->|X-API-Key + HTTPS| Proxy
-    Proxy --> API
-    API --> DB
-```
+- OpenAPI contract at `/openapi.json`.
 
 ## API surface
 
-### Agent ingestion
+### Legacy v1 — Windows/RDP
 
 - `POST /api/v1/agent/events`
 - `POST /api/v1/agent/snapshot`
+- `GET /api/v1/servers`
+- `GET /api/v1/servers/{server_id}/summary`
+- `GET /api/v1/servers/{server_id}/sessions/active`
+- `GET /api/v1/servers/{server_id}/sessions/history`
+- `GET /api/v1/alerts/logons?lookback_minutes=5`
+- `GET /api/v1/health`
+
+The v1 read surface remains RDP-only so future SSH telemetry cannot change existing Grafana behavior.
+
+### Generic v2 — remote sessions
+
+- `POST /api/v2/agent/events`
+- `POST /api/v2/agent/snapshot`
+- `GET /api/v2/servers`
+- `GET /api/v2/sessions/active`
+- `GET /api/v2/sessions/history`
+- `GET /api/v2/alerts/logons`
+- `GET /api/v2/health`
 
 Agent ingestion requires:
 
@@ -62,25 +57,11 @@ X-Server-ID: <server-id>
 Authorization: Bearer <agent-secret>
 ```
 
-### Read/query API
-
-- `GET /api/v1/servers`
-- `GET /api/v1/servers/{server_id}/summary`
-- `GET /api/v1/servers/{server_id}/sessions/active`
-- `GET /api/v1/servers/{server_id}/sessions/history`
-- `GET /api/v1/alerts/logons?lookback_minutes=5`
-
 Read/query endpoints require:
 
 ```http
 X-API-Key: <query-api-key>
 ```
-
-The LOGON alert feed returns one row per recently received, idempotently accepted LOGON event across all enabled servers. It is intended for Grafana alert rules that use `alert_id` as a unique instance label and `alert_value` as the numeric condition field.
-
-### Operational
-
-- `GET /api/v1/health`
 
 ## Documentation
 
@@ -89,24 +70,17 @@ The LOGON alert feed returns one row per recently received, idempotently accepte
 - [System architecture](docs/system-architecture.md)
 - [Grafana logon alerting](docs/grafana-alerting.md)
 - [systemd deployment and operations](docs/systemd.md)
-
-## Typical onboarding flow
-
-1. Install and configure the central API.
-2. Register each Windows server with `scripts/register_server.py`.
-3. Store the returned one-time Agent secret securely.
-4. Install RDP Session Agent on that Windows server using its unique `server_id` and secret.
-5. Validate the server summary and current sessions through the query API.
-6. Repeat registration and Agent installation for each additional server.
+- [Phase 3 generic API v2 contract](docs/phase3-generic-api-v2.md)
 
 ## Security model
 
-- Every Windows server receives a unique Agent credential.
+- Every monitored server receives a unique Agent credential.
 - The API stores only a hash of each Agent secret.
 - Agent credentials cannot query session history.
 - Read access uses a separate query API key.
 - Production deployment keeps Uvicorn on loopback and exposes only the reverse proxy.
 - Runtime secrets belong in a protected environment file outside the Git checkout.
+- Session telemetry does not include commands, terminal contents, passwords or private keys.
 
 ## Public repository safety
 

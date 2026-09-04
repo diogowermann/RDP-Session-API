@@ -22,9 +22,11 @@ class Server(Base):
     fqdn: Mapped[str | None] = mapped_column(String(255), nullable=True)
     os_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
     agent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    platform: Mapped[str | None] = mapped_column(String(16), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
     last_snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
     last_boot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    last_boot_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
@@ -58,11 +60,16 @@ class SessionEvent(Base):
         Index("ix_session_events_source_occurred", "source_ip", "occurred_at"),
         Index("ix_session_events_protocol_occurred", "protocol", "occurred_at"),
         Index("ix_session_events_username_occurred", "username", "occurred_at"),
+        Index("ix_session_events_protocol_platform_occurred", "protocol", "platform", "occurred_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     server_id: Mapped[str] = mapped_column(ForeignKey("servers.id", ondelete="CASCADE"), nullable=False)
     protocol: Mapped[str] = mapped_column(String(16), nullable=False, default="RDP", server_default="RDP")
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, default="windows", server_default="windows")
+    provider_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_event_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    boot_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     event_type: Mapped[str] = mapped_column(String(16), nullable=False)
     event_channel: Mapped[str] = mapped_column(String(255), nullable=False)
     event_id: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -93,11 +100,16 @@ class RdpSession(Base):
         Index("ix_sessions_initial_source_logon", "initial_source_ip", "logon_at"),
         Index("ix_sessions_last_source_logon", "last_source_ip", "logon_at"),
         Index("ix_sessions_correlation_status_updated", "correlation_status", "updated_at"),
+        Index("ix_sessions_protocol_platform_state", "protocol", "platform", "state"),
+        Index("ix_sessions_server_provider", "server_id", "protocol", "provider_session_id", "boot_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     server_id: Mapped[str] = mapped_column(ForeignKey("servers.id", ondelete="CASCADE"), nullable=False)
     protocol: Mapped[str] = mapped_column(String(16), nullable=False, default="RDP", server_default="RDP")
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, default="windows", server_default="windows")
+    provider_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    boot_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     windows_session_id: Mapped[int] = mapped_column(Integer, nullable=False)
     username: Mapped[str] = mapped_column(String(255), nullable=False)
     domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -119,6 +131,9 @@ class RdpSession(Base):
     )
 
     server: Mapped[Server] = relationship(back_populates="sessions")
+
+
+RemoteSession = RdpSession
 
 
 class CorrelationEvidence(Base):

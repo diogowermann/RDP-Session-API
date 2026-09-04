@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,9 +17,13 @@ router = APIRouter(
 )
 
 
+def _is_v1_server(server: Server) -> bool:
+    return server.platform in (None, "windows")
+
+
 def _get_server(db: Session, server_id: str) -> Server:
     server = db.get(Server, server_id)
-    if server is None:
+    if server is None or not _is_v1_server(server):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="server not found")
     return server
 
@@ -59,7 +63,11 @@ def _session_item(session: RdpSession, now: datetime | None = None) -> SessionIt
 
 @router.get("", response_model=list[ServerItem])
 def list_servers(db: Session = Depends(get_db)) -> list[ServerItem]:
-    servers = db.scalars(select(Server).order_by(Server.hostname, Server.id)).all()
+    servers = db.scalars(
+        select(Server)
+        .where(or_(Server.platform.is_(None), Server.platform == "windows"))
+        .order_by(Server.hostname, Server.id)
+    ).all()
     return [_server_item(server) for server in servers]
 
 
@@ -69,6 +77,7 @@ def server_summary(server_id: str, db: Session = Depends(get_db)) -> ServerSumma
     sessions = db.scalars(
         select(RdpSession).where(
             RdpSession.server_id == server_id,
+            RdpSession.protocol == "RDP",
             RdpSession.state.in_(["ACTIVE", "DISCONNECTED"]),
         )
     ).all()
@@ -89,7 +98,11 @@ def active_sessions(server_id: str, db: Session = Depends(get_db)) -> list[Sessi
     _get_server(db, server_id)
     sessions = db.scalars(
         select(RdpSession)
-        .where(RdpSession.server_id == server_id, RdpSession.state == "ACTIVE")
+        .where(
+            RdpSession.server_id == server_id,
+            RdpSession.protocol == "RDP",
+            RdpSession.state == "ACTIVE",
+        )
         .order_by(RdpSession.logon_at, RdpSession.id)
     ).all()
     now = utc_now()
@@ -109,6 +122,7 @@ def session_history(
     _get_server(db, server_id)
     statement = select(RdpSession).where(
         RdpSession.server_id == server_id,
+        RdpSession.protocol == "RDP",
         RdpSession.state == "CLOSED",
     )
     if from_at is not None:
