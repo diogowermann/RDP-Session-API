@@ -11,6 +11,7 @@ This directory contains the public technical documentation for RDP Session API.
 - [Phase 0 baseline capture](phase0-baseline.md) — pre-expansion operational evidence, backup/restore gate, version consistency and exit criteria.
 - [Phase 1 additive origin schema](phase1-additive-origin-schema.md) — additive storage for protocol, connection origin and future correlation jobs/evidence while preserving the Agent v1 contract.
 - [Phase 2 RDP origin support in API v1](phase2-rdp-origin-v1.md) — optional origin fields, non-rejecting normalization and session semantics required before Agent 0.3.0 rollout.
+- [Phase 3 generic API v2 contract](phase3-generic-api-v2.md) — protocol-neutral provider identity, v1 normalization, v2 ingestion/read surfaces, compatibility and rollout gate.
 
 ## Companion project
 
