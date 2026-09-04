@@ -43,6 +43,8 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
                 logon_at=to_utc_naive(observed.logon_at) if observed.logon_at else None,
                 last_connected_at=to_utc_naive(observed.logon_at) if observed.logon_at and observed.state.value == "ACTIVE" else None,
                 last_disconnected_at=to_utc_naive(snapshot.agent_time_utc) if observed.state.value == "DISCONNECTED" else None,
+                initial_source_ip=observed.source_ip,
+                last_source_ip=observed.source_ip,
             )
             db.add(session)
             db.flush()
@@ -55,6 +57,8 @@ def reconcile_snapshot(db: Session, *, server: Server, snapshot: AgentSnapshot) 
                 else:
                     session.last_disconnected_at = to_utc_naive(snapshot.agent_time_utc)
             session.logon_at = session.logon_at or (to_utc_naive(observed.logon_at) if observed.logon_at else None)
+            if observed.source_ip is not None:
+                session.last_source_ip = observed.source_ip
             updated += 1
         seen_session_ids.add(session.id)
 

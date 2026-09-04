@@ -7,7 +7,7 @@ from app.api.servers import router as servers_router
 
 app = FastAPI(
     title="RDP Session API",
-    version="0.2.0",
+    version="0.3.0",
     description="Receives RDP session events and state snapshots from authenticated Windows agents.",
 )
 

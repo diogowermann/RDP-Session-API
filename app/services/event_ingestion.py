@@ -52,6 +52,8 @@ def ingest_events(db: Session, *, server: Server, envelope: AgentEnvelope) -> In
                 domain=event.domain,
                 boot_time=normalized_boot_time,
                 occurred_at=to_utc_naive(event.occurred_at),
+                source_ip=event.source_ip,
+                source_port=event.source_port,
                 event_fingerprint=fingerprint,
                 payload_version=envelope.contract_version,
             )
