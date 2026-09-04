@@ -77,6 +77,7 @@ def apply_event(db: Session, *, server: Server, boot_time: datetime, event: Agen
         if session is None:
             session = RdpSession(
                 server_id=server.id,
+                protocol="RDP",
                 windows_session_id=event.session_id,
                 username=event.username,
                 domain=event.domain,
