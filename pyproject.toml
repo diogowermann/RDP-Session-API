@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rdp-session-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "REST API for collecting and querying Windows RDP session telemetry."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -15,6 +15,14 @@ def _same_user(session: RdpSession, username: str, domain: str | None) -> bool:
     return session.username.casefold() == username.casefold() and (session.domain or "").casefold() == (domain or "").casefold()
 
 
+def _apply_connected_source(session: RdpSession, source_ip: str | None, *, allow_initial: bool) -> None:
+    if source_ip is None:
+        return
+    if allow_initial and session.initial_source_ip is None:
+        session.initial_source_ip = source_ip
+    session.last_source_ip = source_ip
+
+
 def find_open_session(
     db: Session,
     *,
@@ -85,12 +93,15 @@ def apply_event(db: Session, *, server: Server, boot_time: datetime, event: Agen
                 state="ACTIVE",
                 logon_at=to_utc_naive(event.occurred_at),
                 last_connected_at=to_utc_naive(event.occurred_at),
+                initial_source_ip=event.source_ip,
+                last_source_ip=event.source_ip,
             )
             db.add(session)
         else:
             session.state = "ACTIVE"
             session.logon_at = session.logon_at or to_utc_naive(event.occurred_at)
             session.last_connected_at = to_utc_naive(event.occurred_at)
+            _apply_connected_source(session, event.source_ip, allow_initial=True)
         return
 
     if session is None:
@@ -103,6 +114,7 @@ def apply_event(db: Session, *, server: Server, boot_time: datetime, event: Agen
     elif event.type == EventType.RECONNECT:
         session.state = "ACTIVE"
         session.last_connected_at = to_utc_naive(event.occurred_at)
+        _apply_connected_source(session, event.source_ip, allow_initial=False)
     elif event.type == EventType.LOGOFF:
         session.state = "CLOSED"
         session.logoff_at = to_utc_naive(event.occurred_at)

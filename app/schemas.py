@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from ipaddress import ip_address
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,6 +23,38 @@ def require_timezone(value: datetime | None) -> datetime | None:
     return value
 
 
+def normalize_source_ip(value: object) -> str | None:
+    """Return a canonical usable IP or None without rejecting the payload."""
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text or text.upper() == "LOCAL":
+        return None
+
+    try:
+        address = ip_address(text)
+    except ValueError:
+        return None
+
+    if address.is_loopback or address.is_unspecified:
+        return None
+    return str(address)
+
+
+def normalize_source_port(value: object) -> int | None:
+    """Normalize an optional source port without making telemetry invalid."""
+    if value is None or value == "":
+        return None
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return None
+    if port < 1 or port > 65535:
+        return None
+    return port
+
+
 class AgentEvent(BaseModel):
     event_id: int
     record_id: int = Field(ge=0)
@@ -29,6 +62,8 @@ class AgentEvent(BaseModel):
     session_id: int = Field(ge=0)
     username: str = Field(min_length=1, max_length=255)
     domain: str | None = Field(default=None, max_length=255)
+    source_ip: str | None = Field(default=None, max_length=45)
+    source_port: int | None = None
     occurred_at: datetime
     channel: str = Field(
         default="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational",
@@ -36,6 +71,8 @@ class AgentEvent(BaseModel):
         max_length=255,
     )
 
+    _source_ip_normalized = field_validator("source_ip", mode="before")(normalize_source_ip)
+    _source_port_normalized = field_validator("source_port", mode="before")(normalize_source_port)
     _occurred_has_timezone = field_validator("occurred_at")(require_timezone)
 
 
@@ -62,7 +99,9 @@ class SnapshotSession(BaseModel):
     domain: str | None = Field(default=None, max_length=255)
     state: SnapshotState
     logon_at: datetime | None = None
+    source_ip: str | None = Field(default=None, max_length=45)
 
+    _source_ip_normalized = field_validator("source_ip", mode="before")(normalize_source_ip)
     _logon_has_timezone = field_validator("logon_at")(require_timezone)
 
 
