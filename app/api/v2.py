@@ -318,6 +318,10 @@ def session_timeline(session_id: str, db: Session = Depends(get_db)) -> V2Sessio
     ]
     if session.boot_id is not None:
         event_filters.append(SessionEvent.boot_id == session.boot_id)
+    if session.logon_at is not None:
+        event_filters.append(SessionEvent.occurred_at >= session.logon_at)
+    if session.logoff_at is not None:
+        event_filters.append(SessionEvent.occurred_at <= session.logoff_at)
 
     events = db.scalars(
         select(SessionEvent)
