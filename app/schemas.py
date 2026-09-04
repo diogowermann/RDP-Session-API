@@ -27,6 +27,12 @@ class AgentPlatform(str, Enum):
     LINUX = "linux"
 
 
+class RemoteSessionState(str, Enum):
+    ACTIVE = "ACTIVE"
+    DISCONNECTED = "DISCONNECTED"
+    CLOSED = "CLOSED"
+
+
 def require_timezone(value: datetime | None) -> datetime | None:
     if value is not None and (value.tzinfo is None or value.utcoffset() is None):
         raise ValueError("timestamp must include an explicit UTC offset")
@@ -295,11 +301,14 @@ class V2SessionItem(BaseModel):
     protocol: str
     platform: str
     provider_session_id: str
+    boot_id: str | None
     username: str
     domain: str | None
     state: str
     logon_at: datetime | None
     logoff_at: datetime | None
+    last_connected_at: datetime | None
+    last_disconnected_at: datetime | None
     duration_minutes: int | None
     disconnect_count: int
     end_reason: str | None
@@ -308,10 +317,55 @@ class V2SessionItem(BaseModel):
     correlation_status: str | None
 
 
+class V2SessionListItem(V2SessionItem):
+    hostname: str
+    fqdn: str | None
+
+
 class V2SessionPage(BaseModel):
-    items: list[V2SessionItem]
+    items: list[V2SessionListItem]
+    total: int
     limit: int
     offset: int
+
+
+class V2SessionEventItem(BaseModel):
+    id: str
+    event_type: str
+    protocol: str
+    platform: str
+    provider_event_id: str | None
+    source_ip: str | None
+    source_port: int | None
+    occurred_at: datetime
+    received_at: datetime
+    correlation_status: str | None
+
+
+class V2CorrelationEvidenceItem(BaseModel):
+    id: str
+    status: str
+    source_ip: str
+    observed_at: datetime
+    source_device_id: str | None
+    integration_record_id: str | None
+    asset_tag: str | None
+    method: str | None
+    confidence: float | None
+    reason_code: str | None
+    created_at: datetime
+
+
+class V2SessionDetail(BaseModel):
+    session: V2SessionListItem
+    server: V2ServerItem
+    correlation_evidence: list[V2CorrelationEvidenceItem]
+
+
+class V2SessionTimeline(BaseModel):
+    session_id: str
+    events: list[V2SessionEventItem]
+    correlation_evidence: list[V2CorrelationEvidenceItem]
 
 
 class V2LogonAlertItem(BaseModel):
