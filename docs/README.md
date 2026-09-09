@@ -13,6 +13,7 @@ This directory contains the public technical documentation for RDP Session API.
 - [Phase 2 RDP origin support in API v1](phase2-rdp-origin-v1.md) — optional origin fields, non-rejecting normalization and session semantics required before Agent 0.3.0 rollout.
 - [Phase 3 generic API v2 contract](phase3-generic-api-v2.md) — protocol-neutral provider identity, v1 normalization, v2 ingestion/read surfaces, compatibility and rollout gate.
 - [Phase 4 global session history API](phase4-global-history.md) — global pagination and filters, session detail/timeline, correlation-evidence visibility and the Portal service-to-service security boundary.
+- [Phase 6 asynchronous session correlation](phase6-async-correlation.md) — resolver client, bounded retry queue, frozen correlation evidence, worker runtime, metrics and controlled rollout.
 
 ## Companion project
 
