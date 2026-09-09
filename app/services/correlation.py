@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 from sqlalchemy import func, or_, select
@@ -15,6 +15,7 @@ from app.timeutils import utc_now
 
 CORRELATION_TERMINAL_STATUSES = ("MATCHED", "AMBIGUOUS", "UNRESOLVED")
 CORRELATION_QUEUE_STATUSES = ("PENDING", "RETRY")
+CORRELATABLE_EVENT_TYPES = ("LOGON", "RECONNECT")
 
 
 class CorrelationResolver(Protocol):
@@ -181,6 +182,7 @@ def discover_correlation_jobs(
     events = db.scalars(
         select(SessionEvent)
         .where(
+            SessionEvent.event_type.in_(CORRELATABLE_EVENT_TYPES),
             SessionEvent.source_ip.is_not(None),
             SessionEvent.correlation_status.is_(None),
         )
@@ -244,6 +246,30 @@ def _confidence_score(value: object) -> float | None:
     return scores.get(normalized)
 
 
+def _optional_text(value: object, *, max_length: int, error_code: str, label: str) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if len(text) > max_length:
+        raise ResolverProtocolError(error_code, f"resolver {label} exceeds storage contract")
+    return text
+
+
+def _device_uuid(value: object) -> str | None:
+    text = _optional_text(
+        value,
+        max_length=36,
+        error_code="resolver_device_id_too_long",
+        label="device UUID",
+    )
+    if text is None:
+        return None
+    try:
+        return str(UUID(text))
+    except ValueError as exc:
+        raise ResolverProtocolError("resolver_invalid_device_uuid", "resolver device UUID is invalid") from exc
+
+
 def _evidence_from_payload(
     *,
     job: CorrelationJob,
@@ -255,17 +281,21 @@ def _evidence_from_payload(
         raise ResolverProtocolError("resolver_invalid_status", "resolver status is not terminal")
 
     device = payload.get("device") if isinstance(payload.get("device"), dict) else {}
-    device_uuid = str(device.get("uuid") or "").strip() or None
+    device_uuid = _device_uuid(device.get("uuid"))
     if resolution_status == "MATCHED" and device_uuid is None:
         raise ResolverProtocolError("resolver_matched_without_device", "MATCHED response did not include device UUID")
-    if device_uuid is not None and len(device_uuid) > 36:
-        raise ResolverProtocolError("resolver_device_id_too_long", "resolved device UUID exceeds storage contract")
 
     asset_resolution = payload.get("asset_resolution") if isinstance(payload.get("asset_resolution"), dict) else {}
     asset = asset_resolution.get("asset") if isinstance(asset_resolution.get("asset"), dict) else {}
     link_ids = asset_resolution.get("link_ids") if isinstance(asset_resolution.get("link_ids"), list) else []
-    integration_record_id = str(link_ids[0]) if asset_resolution.get("status") == "MATCHED" and len(link_ids) == 1 else None
-    asset_tag = str(asset.get("asset_tag") or "").strip() or None
+    integration_record_id = None
+    if str(asset_resolution.get("status") or "").upper() == "MATCHED" and len(link_ids) == 1:
+        integration_record_id = _optional_text(
+            link_ids[0],
+            max_length=36,
+            error_code="resolver_integration_record_id_too_long",
+            label="integration record id",
+        )
 
     return CorrelationEvidence(
         id=_evidence_id_for_event(job.session_event_id or job.id),
@@ -276,10 +306,25 @@ def _evidence_from_payload(
         observed_at=job.observed_at,
         source_device_id=device_uuid,
         integration_record_id=integration_record_id,
-        asset_tag=asset_tag,
-        method=str(payload.get("method") or "").strip() or None,
+        asset_tag=_optional_text(
+            asset.get("asset_tag"),
+            max_length=64,
+            error_code="resolver_asset_tag_too_long",
+            label="asset tag",
+        ),
+        method=_optional_text(
+            payload.get("method"),
+            max_length=64,
+            error_code="resolver_method_too_long",
+            label="method",
+        ),
         confidence=_confidence_score(payload.get("confidence")),
-        reason_code=str(payload.get("reason_code") or "").strip() or None,
+        reason_code=_optional_text(
+            payload.get("reason_code"),
+            max_length=64,
+            error_code="resolver_reason_code_too_long",
+            label="reason code",
+        ),
         evidence_snapshot=payload,
         created_at=created_at,
     )
