@@ -17,11 +17,13 @@ The Windows collector is maintained separately in [RDP-Session-Agent](https://gi
 - Consolidated session states: `ACTIVE`, `DISCONNECTED`, and `CLOSED`.
 - Snapshot reconciliation for current-state correction.
 - Optional IPv4/IPv6 connection origin.
+- Asynchronous temporal source correlation with frozen resolver evidence and bounded retry.
+- Correlation queue/match metrics for operational dashboards.
 - Separate `X-API-Key` protection for read/query endpoints.
 - Cross-server LOGON alert feeds.
 - SQLAlchemy persistence with Alembic migrations.
 - MariaDB / MySQL production support and SQLite-compatible tests.
-- Managed Linux deployment through systemd.
+- Managed Linux deployment through separate API and correlation-worker systemd services.
 - Loopback-only Uvicorn deployment behind an HTTPS reverse proxy.
 - OpenAPI contract at `/openapi.json`.
 
@@ -47,6 +49,9 @@ The v1 read surface remains RDP-only so future SSH telemetry cannot change exist
 - `GET /api/v2/servers`
 - `GET /api/v2/sessions/active`
 - `GET /api/v2/sessions/history`
+- `GET /api/v2/sessions/{session_id}`
+- `GET /api/v2/sessions/{session_id}/timeline`
+- `GET /api/v2/correlation/metrics`
 - `GET /api/v2/alerts/logons`
 - `GET /api/v2/health`
 
@@ -71,6 +76,8 @@ X-API-Key: <query-api-key>
 - [Grafana logon alerting](docs/grafana-alerting.md)
 - [systemd deployment and operations](docs/systemd.md)
 - [Phase 3 generic API v2 contract](docs/phase3-generic-api-v2.md)
+- [Phase 4 global session history](docs/phase4-global-history.md)
+- [Phase 6 asynchronous session correlation](docs/phase6-async-correlation.md)
 
 ## Security model
 
@@ -78,6 +85,7 @@ X-API-Key: <query-api-key>
 - The API stores only a hash of each Agent secret.
 - Agent credentials cannot query session history.
 - Read access uses a separate query API key.
+- Resolver access uses a dedicated service-to-service credential held only by the correlation worker environment.
 - Production deployment keeps Uvicorn on loopback and exposes only the reverse proxy.
 - Runtime secrets belong in a protected environment file outside the Git checkout.
 - Session telemetry does not include commands, terminal contents, passwords or private keys.

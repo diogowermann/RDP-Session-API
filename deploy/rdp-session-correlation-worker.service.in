@@ -1,0 +1,41 @@
+[Unit]
+Description=Remote Session Correlation Worker
+After=network-online.target rdp-session-api.service
+Wants=network-online.target
+Requires=rdp-session-api.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=/etc/rdp-session-api/rdp-session-api.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@APP_DIR@/.venv/bin/python -m app.correlation_worker
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rdp-session-correlation-worker
+
+[Install]
+WantedBy=multi-user.target
