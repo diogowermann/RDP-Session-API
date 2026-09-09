@@ -1,7 +1,8 @@
 [Unit]
 Description=Remote Session Correlation Worker
 After=network-online.target rdp-session-api.service
-Wants=network-online.target rdp-session-api.service
+Wants=network-online.target
+Requires=rdp-session-api.service
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
