@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SERVICE_NAME="rdp-session-api"
+WORKER_SERVICE_NAME="rdp-session-correlation-worker"
 SERVICE_USER="rdp-session-api"
 APP_DIR="/opt/rdp-session-api"
 ENV_SOURCE=""
@@ -14,12 +15,13 @@ Usage: sudo bash ./scripts/install_systemd.sh [options]
 Options:
   --app-dir PATH       Application checkout path (default: /opt/rdp-session-api)
   --env-source PATH    Existing environment file to copy into /etc/rdp-session-api/
-  --start              Enable and restart the service after installation
+  --start              Enable and restart the API and correlation worker
   --help               Show this help
 
 The installer never overwrites an existing production environment file unless
---env-source is explicitly supplied. Alembic migrations run as ExecStartPre
-using the same protected environment as the API service.
+--env-source is explicitly supplied. Alembic migrations run as ExecStartPre on
+the API service. The correlation worker shares the protected environment and is
+safe to run with RDP_SESSION_CORRELATION_ENABLED=false.
 EOF
 }
 
@@ -68,16 +70,21 @@ APP_DIR="$(cd "$APP_DIR" 2>/dev/null && pwd)" || {
 }
 
 UNIT_TEMPLATE="$APP_DIR/deploy/rdp-session-api.service.in"
+WORKER_UNIT_TEMPLATE="$APP_DIR/deploy/rdp-session-correlation-worker.service.in"
 UVICORN_BIN="$APP_DIR/.venv/bin/uvicorn"
 ALEMBIC_BIN="$APP_DIR/.venv/bin/alembic"
+PYTHON_BIN="$APP_DIR/.venv/bin/python"
 ENV_DIR="/etc/rdp-session-api"
 ENV_TARGET="$ENV_DIR/rdp-session-api.env"
 UNIT_TARGET="/etc/systemd/system/$SERVICE_NAME.service"
+WORKER_UNIT_TARGET="/etc/systemd/system/$WORKER_SERVICE_NAME.service"
 
-if [ ! -f "$UNIT_TEMPLATE" ]; then
-    echo "Systemd unit template not found: $UNIT_TEMPLATE" >&2
-    exit 1
-fi
+for template in "$UNIT_TEMPLATE" "$WORKER_UNIT_TEMPLATE"; do
+    if [ ! -f "$template" ]; then
+        echo "Systemd unit template not found: $template" >&2
+        exit 1
+    fi
+done
 if [ ! -x "$UVICORN_BIN" ]; then
     echo "Uvicorn executable not found: $UVICORN_BIN" >&2
     echo "Create the virtual environment and install the project first." >&2
@@ -85,6 +92,10 @@ if [ ! -x "$UVICORN_BIN" ]; then
 fi
 if [ ! -x "$ALEMBIC_BIN" ]; then
     echo "Alembic executable not found: $ALEMBIC_BIN" >&2
+    exit 1
+fi
+if [ ! -x "$PYTHON_BIN" ]; then
+    echo "Python executable not found: $PYTHON_BIN" >&2
     exit 1
 fi
 
@@ -112,25 +123,38 @@ fi
 
 escaped_app_dir="$(printf '%s' "$APP_DIR" | sed 's/[&|]/\\&/g')"
 escaped_service_user="$(printf '%s' "$SERVICE_USER" | sed 's/[&|]/\\&/g')"
-sed \
-    -e "s|@APP_DIR@|$escaped_app_dir|g" \
-    -e "s|@SERVICE_USER@|$escaped_service_user|g" \
-    "$UNIT_TEMPLATE" > "$UNIT_TARGET"
-chmod 0644 "$UNIT_TARGET"
+
+render_unit() {
+    template="$1"
+    target="$2"
+    sed \
+        -e "s|@APP_DIR@|$escaped_app_dir|g" \
+        -e "s|@SERVICE_USER@|$escaped_service_user|g" \
+        "$template" > "$target"
+    chmod 0644 "$target"
+}
+
+render_unit "$UNIT_TEMPLATE" "$UNIT_TARGET"
+render_unit "$WORKER_UNIT_TEMPLATE" "$WORKER_UNIT_TARGET"
 
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME.service" >/dev/null
+systemctl enable "$WORKER_SERVICE_NAME.service" >/dev/null
 
 echo "Installed systemd unit: $UNIT_TARGET"
+echo "Installed systemd unit: $WORKER_UNIT_TARGET"
 echo "Service user: $SERVICE_USER"
 echo "Application directory: $APP_DIR"
 echo "Environment file: $ENV_TARGET"
 
 if [ "$START_SERVICE" -eq 1 ]; then
     systemctl restart "$SERVICE_NAME.service"
+    systemctl restart "$WORKER_SERVICE_NAME.service"
     systemctl --no-pager --full status "$SERVICE_NAME.service"
+    systemctl --no-pager --full status "$WORKER_SERVICE_NAME.service"
 else
-    echo "Service enabled but not started."
+    echo "Services enabled but not started/restarted."
     echo "Validate the protected environment file, then use:"
-    echo "  systemctl start $SERVICE_NAME.service"
+    echo "  systemctl restart $SERVICE_NAME.service"
+    echo "  systemctl restart $WORKER_SERVICE_NAME.service"
 fi
