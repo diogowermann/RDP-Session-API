@@ -230,6 +230,7 @@ def session_history(
     username: str | None = Query(default=None, min_length=1, max_length=255),
     provider_session_id: str | None = Query(default=None, min_length=1, max_length=255),
     source_ip: str | None = Query(default=None, min_length=1, max_length=45),
+    source_device_id: str | None = Query(default=None, min_length=1, max_length=64),
     correlation_status: str | None = Query(default=None, min_length=1, max_length=16),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -247,6 +248,14 @@ def session_history(
         source_ip=source_ip,
         correlation_status=correlation_status,
     )
+    if source_device_id is not None:
+        filters.append(
+            RdpSession.id.in_(
+                select(CorrelationEvidence.session_id).where(
+                    CorrelationEvidence.source_device_id == source_device_id
+                )
+            )
+        )
 
     total = db.scalar(
         select(func.count(RdpSession.id))
