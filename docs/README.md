@@ -14,6 +14,7 @@ This directory contains the public technical documentation for RDP Session API.
 - [Phase 3 generic API v2 contract](phase3-generic-api-v2.md) — protocol-neutral provider identity, v1 normalization, v2 ingestion/read surfaces, compatibility and rollout gate.
 - [Phase 4 global session history API](phase4-global-history.md) — global pagination and filters, session detail/timeline, correlation-evidence visibility and the Portal service-to-service security boundary.
 - [Phase 6 asynchronous session correlation](phase6-async-correlation.md) — resolver client, bounded retry queue, frozen correlation evidence, worker runtime, metrics and controlled rollout.
+- [Correlation worker operational runbook](correlation-worker-runbook.md) — health checks, queue and resolver triage, safe containment, upgrades, rollback, credential rotation and recovery gate.
 
 ## Companion project
 
